@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
-from typing import Dict
+from typing import Dict, Any
 
-def _parse_tz(dt: str, truncated: bool) -> Dict:
+def _parse_tz(dt: str, truncated: bool) -> Dict[str, Any]:
     """Parse ISO-8601 formatted time stamp for timezone"""
 
     offset = 0
