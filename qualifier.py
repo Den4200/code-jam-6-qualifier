@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from typing import Dict
 
-def parse_tz(dt: str, truncated: bool) -> timezone:
+def _parse_tz(dt: str, truncated: bool) -> Dict:
     """Parse ISO-8601 formatted time stamp for timezone"""
 
     offset = 0
@@ -95,7 +96,7 @@ def parse_iso8601(timestamp: str) -> datetime:
     else:
         raise Exception('Invalid format: Missing/misplaced dashes')
 
-    tzinfo = parse_tz(dt, truncated)
+    tzinfo = _parse_tz(dt, truncated)
     dt[-1] = tzinfo['milisecs']
 
     try:
