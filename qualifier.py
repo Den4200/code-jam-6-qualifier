@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
+from timeit import timeit
+
 
 def _parse_tz(dt: str, truncated: bool) -> Dict[str, Any]:
     """Parse ISO-8601 formatted time stamp for timezone"""
@@ -45,56 +47,73 @@ def _parse_tz(dt: str, truncated: bool) -> Dict[str, Any]:
                 else:
                     # In case an unknown value error appears
                     raise ValueError(error) from None
-            break
+            
+            try:
+                return {
+                    'timezone': timezone(timedelta(seconds=offset*60*60)),
+                    'milisecs': tz[0]
+                }
+            except UnboundLocalError:
+                raise Exception('Invalid format') from None
 
-    try:
-        return {
-            'timezone': timezone(timedelta(seconds=offset*60*60)),
-            'milisecs': tz[0]
-        }
-    except UnboundLocalError:
-        raise Exception('Invalid format') from None
+    # Return defaults if there is not timezone specified
+    return {
+        'timezone': None,
+        'milisecs': dt[-1]
+    }
+
 
 def parse_iso8601(timestamp: str) -> datetime:
     """Parse an ISO-8601 formatted time stamp."""
     
     dt = None
 
-    if timestamp[4] == '-' and timestamp[7] == '-':
-        truncated = False
+    try:
+        if timestamp[4] == '-' and timestamp[7] == '-':
+            truncated = False
 
-        if 'T' in timestamp:
-            ts = timestamp.split('T')
-            mil = ts[1].split('.')
+            if 'T' in timestamp:
+                ts = timestamp.split('T')
+                mil = ts[1].split('.')
 
-            if '.' in timestamp:
-                dt = ts[0].split('-') + mil[0].split(':') + [mil[1]]
+                if '.' in timestamp:
+                    dt = ts[0].split('-') + mil[0].split(':') + [mil[1]]
+                else:
+                    dt = ts[0].split('-') + ts[1].split(':')
+
             else:
-                dt = ts[0].split('-') + ts[1].split(':')
+                dt = timestamp.split('-')
+
+        elif timestamp[4] != '-' and timestamp[7] != '-':
+            truncated = True
+            dt = [timestamp[:4], timestamp[4:6], timestamp[6:8]]
+
+            if 'T' in timestamp:
+                ts = timestamp.split('T')
+                mil = ts[1].split('.')
+
+                dt_temp = [mil[0][:2], mil[0][2:4], mil[0][4:]]
+
+                if dt_temp[0] == '':
+                    raise ValueError("Added 'T' without time")
+
+                dt += [time for time in dt_temp if time != '']
+
+                if '.' in ts[1]:
+                    dt += [mil[1]]
 
         else:
-            dt = timestamp.split('-')
+            raise Exception('Invalid format: Missing/misplaced dashes')
 
-    elif timestamp[4] != '-' and timestamp[7] != '-':
-        truncated = True
-        dt = [timestamp[:4], timestamp[4:6], timestamp[6:8]]
+    except IndexError as e:
+        error = e.__str__()
 
-        if 'T' in timestamp:
-            ts = timestamp.split('T')
-            mil = ts[1].split('.')
+        if error == 'string index out of range':
+            raise Exception('Invalid date format') from None
 
-            dt_temp = [mil[0][:2], mil[0][2:4], mil[0][4:]]
-
-            if dt_temp[0] == '':
-                raise ValueError("Added 'T' without time")
-
-            dt += [time for time in dt_temp if time != '']
-
-            if '.' in ts[1]:
-                dt += [mil[1]]
-
-    else:
-        raise Exception('Invalid format: Missing/misplaced dashes')
+        else:
+            # In case an unknown value error appears
+            raise IndexError(error) from None
 
     tzinfo = _parse_tz(dt, truncated)
     dt[-1] = tzinfo['milisecs']
@@ -110,7 +129,7 @@ def parse_iso8601(timestamp: str) -> datetime:
             'second must be in 0..59': 'Seconds must be within the range of 0 - 59',
             'minute must be in 0..59': 'Minutes must be within the range of 0 - 59',
             'hour must be in 0..23': 'Hours must be within the range of 0 - 23',
-            "invalid literal for int() with base 10: ''": "Added 'T' without time",
+            "invalid literal for int() with base 10: ''": "Added trailing 'T'/'-'/':'",
         }
 
         try:
@@ -127,6 +146,6 @@ def parse_iso8601(timestamp: str) -> datetime:
     except UnboundLocalError:
         raise Exception('Invalid format') from None
 
-dt = '2009-12-23T12:34:56.789012+4:00'
 
-print(parse_iso8601(dt))
+time = timeit("parse_iso8601('2009-12-23T12:23:34.456789+04:00')", globals=globals(), number=100000)/1000
+print(time)
