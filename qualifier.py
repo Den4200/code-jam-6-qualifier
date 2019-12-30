@@ -1,6 +1,27 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from timeit import timeit
+import re
+
+
+def _time_ladder(string):
+    """
+    Falls down the ladder
+    # If didn't have this, list index out of range
+    """
+    strlen = len(string)
+
+    if strlen == 3:
+        if len(string[2]) != 2:
+            raise ValueError('Invalid seconds value')
+
+    if strlen >= 2:
+        if len(string[1]) != 2:
+            raise ValueError('Invalid minutes value')
+
+    if strlen >= 1:
+        if len(string[0]) != 2:
+            raise ValueError('Invalid hour value')
 
 
 def _parse_tz(dt: str, truncated: bool) -> Dict[str, Any]:
@@ -22,15 +43,22 @@ def _parse_tz(dt: str, truncated: bool) -> Dict[str, Any]:
 
                 if len(hm) == 2:
                     hours, mins = hm
+
+                    if len(str(hours)) != 2 or len(str(mins)) != 2:
+                        raise ValueError('Timezone offset format should be HH or HH:MM')
+
                 else:
                     hours, mins = hm[0], ''
+
+                    if len(str(hours)) != 2:
+                        raise ValueError('Invalid timezone offset hour')
 
             elif id_ == 'Z':
                 hours = mins = 0
                 z_index = dt[-1].find('Z')
 
                 if dt[-1][z_index:] != 'Z':
-                    raise Exception("Nothing should be after 'Z'")
+                    raise ValueError("Nothing should be after 'Z'")
 
             mins = 0 if mins == '' else mins
             try:
@@ -54,7 +82,7 @@ def _parse_tz(dt: str, truncated: bool) -> Dict[str, Any]:
                     'milisecs': tz[0]
                 }
             except UnboundLocalError:
-                raise Exception('Invalid format') from None
+                raise ValueError('Invalid format') from None
 
     # Return defaults if there is not timezone specified
     return {
@@ -74,15 +102,30 @@ def parse_iso8601(timestamp: str) -> datetime:
 
             if 'T' in timestamp:
                 ts = timestamp.split('T')
+                ts0 = ts[0].split('-')
                 mil = ts[1].split('.')
 
+                if (len(ts0[0]) != 4 or len(ts0[1]) != 2 or 
+                    len(ts0[2]) != 2 or len(ts0) != 3):
+                    raise ValueError('Date format should be YYYY-MM-DD')
+
                 if '.' in timestamp:
-                    dt = ts[0].split('-') + mil[0].split(':') + [mil[1]]
+                    mil0 = mil[0].split(':')
+                    dt = ts0 + mil0 + [mil[1]]
+
+                    _time_ladder(mil0)
                 else:
-                    dt = ts[0].split('-') + ts[1].split(':')
+                    ts1 = ts[1].split(':')
+                    dt = ts0 + ts1
+
+                    _time_ladder(ts1)
 
             else:
                 dt = timestamp.split('-')
+
+                if (len(dt[0]) != 4 or len(dt[1]) != 2 or 
+                    len(dt[2]) != 2 or len(dt) != 3):
+                    raise ValueError('Date format should be YYYY-MM-DD')
 
         elif timestamp[4] != '-' and timestamp[7] != '-':
             truncated = True
@@ -103,20 +146,21 @@ def parse_iso8601(timestamp: str) -> datetime:
                     dt += [mil[1]]
 
         else:
-            raise Exception('Invalid format: Missing/misplaced dashes')
+            raise ValueError('Invalid format: Missing/misplaced dashes')
 
     except IndexError as e:
         error = e.__str__()
 
         if error == 'string index out of range':
-            raise Exception('Invalid date format') from None
+            raise ValueError('Invalid date format') from None
 
         else:
             # In case an unknown value error appears
             raise IndexError(error) from None
 
     tzinfo = _parse_tz(dt, truncated)
-    dt[-1] = tzinfo['milisecs']
+    zeroes = 6 - len(tzinfo['milisecs'])
+    dt[-1] = int(str(tzinfo['milisecs'] + ('0' * zeroes)))
 
     try:
         return datetime(*map(int, dt), tzinfo=tzinfo['timezone'])
@@ -144,8 +188,12 @@ def parse_iso8601(timestamp: str) -> datetime:
 
     # Timestamp formatted incorrectly
     except UnboundLocalError:
-        raise Exception('Invalid format') from None
+        raise ValueError('Invalid format') from None
 
 
-time = timeit("parse_iso8601('2009-12-23T12:23:34.456789+04:00')", globals=globals(), number=100000)/1000
-print(time)
+dt = '20090223T023243Z'
+print(parse_iso8601(dt))
+
+# time = timeit("parse_iso8601('2009-12-23T12:23:34.456789+04:00')", 
+#                 globals=globals(), number=100000)/1000
+# print(time)
