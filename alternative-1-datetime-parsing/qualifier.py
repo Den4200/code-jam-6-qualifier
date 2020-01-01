@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from timeit import timeit
-import re
 
 
 def _time_ladder(string: str) -> None:
