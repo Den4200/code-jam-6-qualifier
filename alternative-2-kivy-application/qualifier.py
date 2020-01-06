@@ -2,11 +2,11 @@ import os
 
 from kivy.app import App
 from kivy.logger import Logger
-from kivy.factory import Factory
 from kivy.uix.image import Image
 from kivy.uix.popup import Popup
 from kivy.uix.widget import Widget
 from kivy.core.window import Window
+from kivy.animation import Animation
 from kivy.properties import ObjectProperty
 from kivy.uix.behaviors import DragBehavior
 from kivy.uix.floatlayout import FloatLayout
@@ -56,6 +56,21 @@ class DynamicImage(DragBehavior, Image):
 
             self.height += pos[1]
             self.width += pos[1]
+
+    def on_touch_down(self, touch):
+        if touch.is_mouse_scrolling:
+
+            if touch.button == 'scrollup':
+
+                if not (self.height <= 0 or self.width <= 0):
+                    self.height -= 20
+                    self.width -= 20
+
+            elif touch.button == 'scrolldown':
+                self.height += 20
+                self.width += 20
+
+        DragBehavior.on_touch_down(self, touch)
 
 
 class Root(FloatLayout):
